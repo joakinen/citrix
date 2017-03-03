@@ -1,4 +1,4 @@
-# Powershell to automatically provision VM's last Snapshot to a Delivery Group
+# Powershell to automatically provision VM's last/selected Snapshot to a XenDesktop Catalog
 # CC-BY-SA Joaquin Herrero 2017 (@joakinen)
 # https://creativecommons.org/licenses/by-sa/4.0/
 #
