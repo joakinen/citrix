@@ -1,18 +1,22 @@
 # citrix
 Scripts for Citrix API
 
-## provision.ps1
+## Cat-SetImage.ps1
 
-Powershell to automatically provision VM's last Snapshot to a Delivery Group
+This power shell script updates a XenDesktop Catalog (Scheme) with the last snapshot available
+from the machine acting as Master Image or with the selected snapshot.
+Optionally it cal only list all the snapshots available
 
 Check https://support.citrix.com/article/CTX129205 for more information
 
 
 ### Syntax
 
-$ provision -scheme <scheme-name> [-snapshot <snapshot_name> ]
+$ Cat-SetImage -scheme <scheme-name> [-snapshot <snapshot_name> ] [-list]
 
 ### Explanation
 
 This power shell script provisions a XenDesktop Catalog (Scheme) with the last snapshot
-from the machine acting as Master Image or (optionally) with the selected snapshot
+from the machine acting as Master Image or (optionally) with the selected snapshot.
+
+If you enter -list parameter it will only list all snapshots available.
