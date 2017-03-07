@@ -7,7 +7,7 @@
 #
 
 # Syntax
-#    Cat-SetImage -scheme <scheme-name> [-snapshot <snapshot_name> ]
+#    Cat-SetImage [ -scheme <scheme-name> [-list | -snapshot <snapshot_name> ] ]
 #
 # Explanation
 #    This power shell script updates a XenDesktop Catalog (Scheme) with the last snapshot available
@@ -15,15 +15,23 @@
 #    Optionally it cal only list all the snapshots available
 
 param(
-[switch]$list,
-
-[Parameter(Mandatory=$true, HelpMessage="Type name of scheme you are provisioning")]
+[switch] $help,
+[switch] $list,
 [string] $scheme = "", 
-
 [string] $snapshot = ""
-
 )
 
+if ( $help ) {
+Write-Host "Syntax"
+Write-Host "   Cat-SetImage [ -scheme <scheme-name> [-list | -snapshot <snapshot_name> ] ]" -ForegroundColor green
+Write-Host "Examples"
+Write-Host "   Cat-SetImage                                   Lists schemes available" -ForegroundColor DarkGray
+Write-Host "   Cat-SetImage -scheme SC1 -list                 Lists snapshots from scheme SC1" -ForegroundColor DarkGray
+Write-Host "   Cat-SetImage -scheme SC1                       Update scheme SC1 with last snapshot available" -ForegroundColor DarkGray
+Write-Host "   Cat-SetImage -scheme SC1 -snapshot SNAP-1567   Update scheme SC1 with snapshot named SNAP-1567" -ForegroundColor DarkGray
+Write-Host "   Cat-SetImage -help                             This help" -ForegroundColor DarkGray
+return
+}
 
 if ( $snapshot -and !($snapshot -match "(?<cleanSnapshot>.*).snapshot") ) {
 		$snapshot = $snapshot + ".snapshot"
@@ -31,25 +39,33 @@ if ( $snapshot -and !($snapshot -match "(?<cleanSnapshot>.*).snapshot") ) {
 
 Add-PSSnapIn citrix*
 
-if ( $scheme -eq "" ) {
-	Write-Host "Error: missing mandatory parameter"
-	return
-	}
-
 Write-Host "Getting Provisioning Schemes..."
-$Schemes = Get-ProvScheme
 
-$found = $false;
-foreach ( $thiscat in $Schemes ) {
-	$thisScheme = $($thiscat.ProvisioningSchemeName)
-	if ( $thisScheme -eq $scheme ) {
-		$found = $true;
-		$vmPath = "$($thiscat.MasterImageVM)"
-	}
+if ($scheme) {
+
+    $Schemes = Get-ProvScheme
+    $found = $false;
+    foreach ( $thiscat in $Schemes ) {
+	    $thisScheme = $($thiscat.ProvisioningSchemeName)
+        if ( $thisScheme -eq $scheme ) {
+            $found = $true;
+		    $vmPath = "$($thiscat.MasterImageVM)"
+        }
+    }
+} else {
+    $Schemes = Get-BrokerCatalog
+    foreach ( $thiscat in $Schemes ) {
+        Write-Host "$($thiscat.Name)" -foregroundcolor green
+        Write-Host "    $($thiscat.Description)"
+        Write-Host "    Type $($thiscat.AllocationType)"
+        Write-Host "    User changes $($thiscat.PersistUserChanges)"
+    }
+    return
 }
 
+
 if ( $found -eq $false ) {
-	Write-Host "Error: Scheme $scheme not found."
+	Write-Host "Error: Scheme $scheme not found." -foregroundcolor red
 	return
 	} else {
 	Write-Host "Scheme found!"
@@ -59,39 +75,45 @@ if ( $vmPath -match "(?<cleanVMpath>.*).vm" )
       {
          $vmName = $matches['cleanVMpath'] + ".vm"
       } else {
- 	 Write-Host "Error: no .vm found in MasterImageVM field"
+ 	 Write-Host "Error: no .vm found in MasterImageVM field" -foregroundcolor red
 	 return
       }
-Write-Host "MasterImageVM $vmName found!"
+Write-Host "MasterImageVM $vmName found!" -foregroundcolor yellow
 
 Write-Host "Getting Snapshots..."
 $snapshots = Get-ChildItem -Recurse -Path "$vmName" 
 
-$selected_snapshot = "none"
+$selected_snapshot_fullpath = "none"
+$selected_snapshot_name = "none"
 foreach ( $this_snapshot in $snapshots ) {
 	if ($snapshot) {
 		if ($snapshot -eq $this_snapshot) {
-			$selected_snapshot = $($this_snapshot.FullPath)
+			$selected_snapshot_fullpath = $($this_snapshot.FullPath)
+            $selected_snapshot_name = $($this_snapshot.Name)
 		}
 	} else {	
         if ( $list ) {
-            Write-Host ($($this_snapshot))
+            Write-Host ($($this_snapshot)) -foregroundcolor green
         } else {
-		    $selected_snapshot = $($this_snapshot.FullPath)
+		    $selected_snapshot_fullpath = $($this_snapshot.FullPath)
+            $selected_snapshot_name = $($this_snapshot.Name)
         }
 	}
 } 
 
 if ($list) { return }
 
-if ( $snapshot -and $selected_snapshot -eq "none" ) {
-	Write-Host "Error: Snapshot $snapshot not found."
+if ( $snapshot -and $selected_snapshot_fullpath -eq "none" ) {
+	Write-Host "Error: Snapshot $snapshot not found." -foregroundcolor red
 	return
 	}
 
-#Write-Host $last_snapshot
 
-$templatePSPath = $selected_snapshot
+$templatePSPath = $selected_snapshot_fullpath
 
-Write-Host "Provisioning Scheme $scheme with Master Image $templatePSPath..."
+$date_start = Get-Date
+$ds_hour = $date_start.Hour 
+$ds_min  = $date_start.Minute
+$ds_hms  = -join($ds_hour, ":", $ds_min)
+Write-Host ("[$ds_hms] Provisioning Scheme $scheme with Master Image '$selected_snapshot_name'...") -foregroundcolor green
 Publish-ProvMasterVmImage -ProvisioningSchemeName "$scheme" -MasterImageVM "$templatePSPath"
